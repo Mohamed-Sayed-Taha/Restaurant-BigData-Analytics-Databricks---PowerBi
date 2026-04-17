@@ -1,0 +1,27 @@
+Restaurant-Analytics-Databricks/
+│
+├── 📂 sql/
+│   ├── restaurant_analytics.sql    -> all SQL queries(Data Ingestion, Dimension Tables and Fact Table)
+│
+├── 📂 screenshots/
+│   ├── Schema.png
+│   ├── Table.png
+│   ├── Measures.png
+│   ├── Executive_overview.png
+│   ├── Sales___Revenue_Analysis.png
+│   ├── Time_Intelligence.png
+│   ├── Menu_Analysis.png
+│   ├── Customer_Behavior.png
+│   ├── Merge_csv_files.png
+│   ├── Merge_json_files.png
+│   ├── Merge_all_files.png
+│   ├── Create_Dim_branch.png
+│   ├── Create_Dim_category.png
+│   ├── Create_Dim_date.png
+│   ├── Create_Dim_item.png
+│   ├── Create_Dim_payment_method.png
+│   ├── Creatre_Dim_order_type.png
+│   ├── Create_Fact_orders_1.png
+│   └── Create_Fact_orders_2.png
+│
+└── README.md
