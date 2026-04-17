@@ -1,0 +1,191 @@
+-- ============================================================
+--  RESTAURANT ANALYTICS — FULL PIPELINE SQL
+--  Author  : Mohamed Sayed Taha
+--  Tools   : Databricks / Apache Spark SQL / Delta Lake
+--  Dataset : 11.110M rows — Multi-branch Egyptian Restaurant
+-- ============================================================
+
+
+-- ────────────────────────────────────────────────────────────
+-- SECTION 1 : DATA INGESTION
+-- ────────────────────────────────────────────────────────────
+
+-- Step 1: Merge all csv files
+CREATE TABLE IF NOT EXISTS resturant_csv
+USING DELTA
+AS
+SELECT * FROM workspace.google_drive.restaurant_1
+UNION ALL
+SELECT * FROM workspace.google_drive.restaurant_2
+UNION ALL
+SELECT * FROM workspace.google_drive.restaurant_3
+UNION ALL
+SELECT * FROM workspace.google_drive.restaurant_4
+UNION ALL
+SELECT * FROM workspace.google_drive.restaurant_5
+UNION ALL
+SELECT * FROM workspace.google_drive.restaurant_6
+UNION ALL
+SELECT * FROM workspace.google_drive.restaurant_7;
+
+
+-- Step 2: Merge all json files
+CREATE TABLE IF NOT EXISTS resturant_json
+USING DELTA
+AS
+SELECT * FROM workspace.google_drive.restaurant_json_1
+UNION ALL
+SELECT * FROM workspace.google_drive.restaurant_json_2;
+
+
+-- Step 3: Merge csv and json files into unified raw table
+CREATE TABLE IF NOT EXISTS resturant_data
+USING DELTA
+AS
+SELECT * FROM resturant_csv
+UNION ALL
+SELECT * FROM resturant_json;
+
+
+-- ────────────────────────────────────────────────────────────
+-- SECTION 2 : DIMENSION TABLES
+-- ────────────────────────────────────────────────────────────
+
+-- Create Dim_branch
+CREATE OR REPLACE TABLE Dim_branch
+USING DELTA AS
+WITH distinct_branches AS (
+    SELECT DISTINCT branch
+    FROM workspace.default.resturant_data
+    WHERE branch IS NOT NULL
+)
+SELECT
+    branch,
+    ROW_NUMBER() OVER (ORDER BY branch) AS branch_key
+FROM distinct_branches;
+
+
+-- Create Dim_category
+CREATE OR REPLACE TABLE Dim_category
+USING DELTA AS
+WITH distinct_category AS (
+    SELECT DISTINCT category
+    FROM workspace.default.resturant_data
+    WHERE category IS NOT NULL
+)
+SELECT
+    category,
+    ROW_NUMBER() OVER (ORDER BY category) AS category_key
+FROM distinct_category;
+
+
+-- Create Dim_item
+CREATE OR REPLACE TABLE Dim_item
+USING DELTA AS
+WITH distinct_item_name AS (
+    SELECT DISTINCT item_name
+    FROM workspace.default.resturant_data
+    WHERE item_name IS NOT NULL
+)
+SELECT
+    item_name,
+    ROW_NUMBER() OVER (ORDER BY item_name) AS item_key
+FROM distinct_item_name;
+
+
+-- Create Dim_payment_method
+CREATE OR REPLACE TABLE Dim_payment_method
+USING DELTA AS
+WITH distinct_payment_method AS (
+    SELECT DISTINCT payment_method
+    FROM workspace.default.resturant_data
+    WHERE payment_method IS NOT NULL
+)
+SELECT
+    payment_method,
+    ROW_NUMBER() OVER (ORDER BY payment_method) AS payment_method_key
+FROM distinct_payment_method;
+
+
+-- Create Dim_order_type
+CREATE OR REPLACE TABLE Dim_order_type
+USING DELTA AS
+WITH distinct_order_type AS (
+    SELECT DISTINCT order_type
+    FROM workspace.default.resturant_data
+    WHERE order_type IS NOT NULL
+)
+SELECT
+    order_type,
+    ROW_NUMBER() OVER (ORDER BY order_type) AS order_type_key
+FROM distinct_order_type;
+
+
+-- Create Dim_date
+-- Generated from the full date range found in the raw data
+-- Uses Spark sequence() + explode() — no external date table needed
+CREATE OR REPLACE TABLE Dim_date
+USING DELTA AS
+WITH date_range AS (
+    SELECT
+        MIN(order_date) AS start_date,
+        MAX(order_date) AS end_date
+    FROM resturant_data
+),
+dates AS (
+    SELECT explode(sequence(start_date, end_date, interval 1 day)) AS date
+    FROM date_range
+)
+SELECT
+    CAST(date_format(date, 'yyyyMMdd') AS INT)  AS date_key,
+    CAST(date AS DATE)                           AS date,
+    CAST(year(date) AS INT)                      AS year,
+    CAST(quarter(date) AS INT)                   AS quarter,
+    CAST(month(date) AS INT)                     AS month_number,
+    CAST(date_format(date, 'MMMM') AS STRING)    AS month_name,
+    CAST(day(date) AS INT)                       AS day_number,
+    CAST(date_format(date, 'EEEE') AS STRING)    AS day_name,
+    CAST(dayofweek(date) AS INT)                 AS day_of_week
+FROM dates;
+
+
+-- ────────────────────────────────────────────────────────────
+-- SECTION 3 : FACT TABLE
+-- ────────────────────────────────────────────────────────────
+
+-- Create Fact_orders
+-- Joins all dimensions to the raw data
+-- Derives time_slot from the order hour
+CREATE OR REPLACE TABLE Fact_orders
+USING DELTA AS
+SELECT
+    r.order_id,
+    r.order_date,
+    d.date_key,
+    r.hour,
+    CASE
+        WHEN CAST(hour AS INT) BETWEEN 6  AND 10 THEN 'breakfast'
+        WHEN CAST(hour AS INT) BETWEEN 11 AND 14 THEN 'lunch'
+        WHEN CAST(hour AS INT) BETWEEN 15 AND 17 THEN 'afternoon'
+        WHEN CAST(hour AS INT) BETWEEN 18 AND 22 THEN 'dinner'
+        ELSE 'late night'
+    END AS time_slot,
+    c.category_key,
+    i.item_key,
+    r.price,
+    r.quantity,
+    r.discount,
+    r.total_amount,
+    b.branch_key,
+    p.payment_method_key,
+    ot.order_type_key,
+    r.customer_id,
+    r.rating,
+    r.is_weekend
+FROM workspace.default.resturant_data AS r
+LEFT JOIN dim_branch         AS b  ON r.branch         = b.branch
+LEFT JOIN dim_category       AS c  ON r.category       = c.category
+LEFT JOIN dim_item           AS i  ON r.item_name      = i.item_name
+LEFT JOIN dim_payment_method AS p  ON r.payment_method = p.payment_method
+LEFT JOIN dim_order_type     AS ot ON r.order_type     = ot.order_type
+LEFT JOIN dim_date           AS d  ON r.order_date     = d.date;
