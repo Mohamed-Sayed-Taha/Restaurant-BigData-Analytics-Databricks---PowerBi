@@ -77,11 +77,11 @@ resturant_csv  resturant_json
    └────┬────┘
         │  UNION ALL
         ▼
-  resturant_data  (Delta Lake — unified raw table)
+  restaurant_data  (Delta Lake — unified raw table)
         │
         ▼
   ┌─────────────────────────────────────────────┐
-  │           Star Schema (Delta Lake)           │
+  │           Star Schema (Delta Lake)          │
   │                                             │
   │  Dim_branch      Dim_category               │
   │  Dim_item        Dim_payment_method         │
@@ -110,8 +110,8 @@ Connected Google Drive to **Fivetran**, which automatically synced all source fi
 ### Step 1 — Merge all CSV files into one table
 
 ```sql
--- Merge all csv files
-CREATE TABLE IF NOT EXISTS resturant_csv
+-- Merge all CSV files
+CREATE TABLE IF NOT EXISTS restaurant_csv
 USING DELTA
 as
 SELECT * from workspace.google_drive.restaurant_1
@@ -132,8 +132,8 @@ SELECT * from workspace.google_drive.restaurant_7;
 ### Step 2 — Merge all JSON files into one table
 
 ```sql
--- Merge all json files
-CREATE TABLE IF NOT EXISTS resturant_json
+-- Merge all JSON files
+CREATE TABLE IF NOT EXISTS restaurant_json
 USING DELTA
 as
 SELECT * from workspace.google_drive.restaurant_json_1
@@ -144,8 +144,8 @@ SELECT * from workspace.google_drive.restaurant_json_2
 ### Step 3 — Merge CSV + JSON into unified raw table
 
 ```sql
--- Merge csv and json files
-CREATE TABLE IF NOT EXISTS resturant_data
+-- Merge CSV and JSON files
+CREATE TABLE IF NOT EXISTS restaurant_data
 USING DELTA
 as
 SELECT * from resturant_csv
@@ -153,7 +153,7 @@ UNION ALL
 SELECT * from resturant_json
 ```
 
-> The unified `resturant_data` table contains **11.110M rows** and is the single source of truth for all downstream modeling.
+> The unified `restaurant_data` table contains **11.110M rows** and is the single source of truth for all downstream modeling.
 
 ---
 
@@ -163,7 +163,8 @@ The data model follows a **Star Schema** design — one central Fact table surro
 
 ### Schema Diagram
 
-![Schema](screenshots/Schema.png)
+<img width="1010" height="752" alt="Schema" src="https://github.com/user-attachments/assets/3e6a7763-d4e2-4bff-89bb-0860547a19cb" />
+
 
 | Table | Type | Key Column |
 |---|---|---|
@@ -338,7 +339,7 @@ SELECT
     r.customer_id,
     r.rating,
     r.is_weekend
-FROM workspace.default.resturant_data AS r
+FROM workspace.default.restaurant_data AS r
 LEFT JOIN dim_branch          AS b  ON r.branch         = b.branch
 LEFT JOIN dim_category        AS c  ON r.category       = c.category
 LEFT JOIN dim_item            AS i  ON r.item_name      = i.item_name
@@ -446,7 +447,8 @@ All 5 pages share the same restaurant-themed color palette (dark brown + warm am
 
 > High-level business summary for leadership — revenue, orders, ratings, and branch/category performance.
 
-![Executive Overview](screenshots/Executive_overview.png)
+<img width="1402" height="791" alt="Executive overview" src="https://github.com/user-attachments/assets/98dfcb89-696b-4fd4-ba53-031d619a025d" />
+
 
 **Highlights:**
 - Total Revenue: **$2.898bn** | Avg Order Value: **$261** | Total Orders: **11.110M** | Avg Rating: **3.7**
@@ -461,7 +463,8 @@ All 5 pages share the same restaurant-themed color palette (dark brown + warm am
 
 > Breakdown of revenue streams by payment method, order type, price per item, and year-over-year trends.
 
-![Sales & Revenue](screenshots/Sales___Revenue_Rnalysis.png)
+<img width="1405" height="790" alt="Sales   Revenue Rnalysis" src="https://github.com/user-attachments/assets/39fb16ce-e1c6-4a48-ad40-14e3bd0510a9" />
+
 
 **Highlights:**
 - Total Net Revenue: **$2.898bn** | Gross Revenue (before discount): **$3.063bn**
@@ -477,7 +480,8 @@ All 5 pages share the same restaurant-themed color palette (dark brown + warm am
 
 > Order volume and rating trends broken down by hour, time slot, day of week, and month.
 
-![Time Intelligence](screenshots/Time_Intelligence.png)
+<img width="1398" height="791" alt="Time Intelligence" src="https://github.com/user-attachments/assets/042b3525-8767-4591-aa36-34848858539b" />
+
 
 **Highlights:**
 - Total Revenue: **$2.898bn** | Avg Order Value: **$261** | Orders: **11.110M**
@@ -494,7 +498,8 @@ All 5 pages share the same restaurant-themed color palette (dark brown + warm am
 
 > Item and category deep-dive — revenue, average price, and discount behavior by menu item.
 
-![Menu Analysis](screenshots/Menu_Analysis.png)
+<img width="1400" height="788" alt="Menu Analysis" src="https://github.com/user-attachments/assets/40b81be0-d298-46f9-be68-01c995621ab3" />
+
 
 **Highlights:**
 - **15 distinct menu items** across 5 categories
@@ -510,7 +515,8 @@ All 5 pages share the same restaurant-themed color palette (dark brown + warm am
 
 > Loyalty, repeat rate, order volume by customer, and behavioral patterns across time and order type.
 
-![Customer Behavior](screenshots/Customer_Behavior.png)
+<img width="1397" height="791" alt="Customer Behavior" src="https://github.com/user-attachments/assets/19b1335a-38ff-4769-8058-952a2a8b6383" />
+
 
 **Highlights:**
 - **200K unique customers** | **100% repeat customer rate** — every customer has ordered more than once
@@ -543,16 +549,7 @@ All 5 pages share the same restaurant-themed color palette (dark brown + warm am
 Restaurant-Analytics-Databricks/
 │
 ├── 📂 sql/
-│   ├── 01_merge_csv_files.sql          ← Merge 7 CSV sources → resturant_csv
-│   ├── 02_merge_json_files.sql         ← Merge 2 JSON sources → resturant_json
-│   ├── 03_merge_all_files.sql          ← UNION csv + json → resturant_data
-│   ├── 04_create_dim_branch.sql
-│   ├── 05_create_dim_category.sql
-│   ├── 06_create_dim_item.sql
-│   ├── 07_create_dim_payment_method.sql
-│   ├── 08_create_dim_order_type.sql
-│   ├── 09_create_dim_date.sql
-│   └── 10_create_fact_orders.sql
+│   ├── restaurant_analytics.sql    -> all SQL queries(Data Ingestion, Dimension Tables and Fact Table)
 │
 ├── 📂 screenshots/
 │   ├── Schema.png
